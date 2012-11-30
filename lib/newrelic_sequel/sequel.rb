@@ -121,6 +121,10 @@ DependencyDetection.defer do
   end
 
   executes do
+    NewRelic::Agent.logger.debug 'Installing Sequel instrumentation'
+  end
+
+  executes do
     if defined?(SequelRails)
       ActiveSupport::Notifications.subscribe("sql.sequel") do |*args|
         event = ActiveSupport::Notifications::Event.new(*args)
