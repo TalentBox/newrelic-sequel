@@ -77,7 +77,7 @@ module NewRelic
         end
 
         def self.extract_operation_from_sql(sql)
-          case sql
+          case sql[0...15]
           when /^\s*select/i then
             'find'
           when /^\s*(update|insert)/i then
