@@ -1,3 +1,5 @@
 .idea
 .DS_Store
 Gemfile.lock
+*.orig
+pkg
