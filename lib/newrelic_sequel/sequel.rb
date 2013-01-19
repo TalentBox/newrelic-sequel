@@ -64,15 +64,8 @@ end
 module NewRelic
   module Agent
     module Instrumentation
-      module SequelInstrumentation
-        def self.included(klass)
-          klass.class_eval do
-            alias_method :log_duration_without_newrelic_instrumentation, :log_duration
-            alias_method :log_duration, :log_duration_with_newrelic_instrumentation
-          end
-        end
-
-        def log_duration_with_newrelic_instrumentation(duration, sql)
+      module SequelDurationRecorder
+        def self.record(duration, sql)
           return unless NewRelic::Agent.is_execution_traced?
           return unless operation = extract_operation_from_sql(sql)
           NewRelic::Agent.instance.transaction_sampler.notice_sql(sql, nil, duration)
@@ -81,13 +74,9 @@ module NewRelic
           metrics.each do |metric|
             NewRelic::Agent.instance.stats_engine.get_stats_no_scope(metric).trace_call(duration)
           end
-        ensure
-          log_duration_without_newrelic_instrumentation(duration, sql)
         end
 
-        private
-
-        def extract_operation_from_sql(sql)
+        def self.extract_operation_from_sql(sql)
           case sql
           when /^\s*select/i then
             'find'
@@ -106,7 +95,21 @@ module NewRelic
             nil
           end
         end
+      end
 
+      module SequelInstrumentation
+        def self.included(klass)
+          klass.class_eval do
+            alias_method :log_duration_without_newrelic_instrumentation, :log_duration
+            alias_method :log_duration, :log_duration_with_newrelic_instrumentation
+          end
+        end
+
+        def log_duration_with_newrelic_instrumentation(duration, sql)
+          SequelDurationRecorder.record(duration, sql)
+        ensure
+          log_duration_without_newrelic_instrumentation(duration, sql)
+        end
       end
     end
   end
@@ -118,9 +121,15 @@ DependencyDetection.defer do
   end
 
   executes do
-    ::Sequel::Database.class_eval do
-      include ::NewRelic::Agent::Instrumentation::SequelInstrumentation
+    if defined?(SequelRails)
+      ActiveSupport::Notifications.subscribe("sql.sequel") do |*args|
+        event = ActiveSupport::Notifications::Event.new(*args)
+        ::NewRelic::Agent::Instrumentation::SequelDurationRecorder.record(event.duration, event.payload[:sql])
+      end
+    else
+      ::Sequel::Database.class_eval do
+        include ::NewRelic::Agent::Instrumentation::SequelInstrumentation
+      end
     end
   end
 end
-
