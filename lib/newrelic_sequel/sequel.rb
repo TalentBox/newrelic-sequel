@@ -68,16 +68,17 @@ module NewRelic
         def self.record(duration, sql)
           return unless NewRelic::Agent.is_execution_traced?
           return unless operation = extract_operation_from_sql(sql)
+
           NewRelic::Agent.instance.transaction_sampler.notice_sql(sql, nil, duration)
 
           metrics = ["ActiveRecord/#{operation}", 'ActiveRecord/all']
           metrics.each do |metric|
-            NewRelic::Agent.instance.sql_sampler.notice_sql(sql, metric, nil, duration)
+            NewRelic::Agent.instance.stats_engine.get_stats_no_scope(metric).trace_call(duration)
           end
         end
 
         def self.extract_operation_from_sql(sql)
-          case sql[0...15]
+          case sql[0..15]
           when /^\s*select/i then
             'find'
           when /^\s*(update|insert)/i then
@@ -121,17 +122,15 @@ DependencyDetection.defer do
   end
 
   executes do
-    NewRelic::Agent.logger.debug 'Installing Sequel instrumentation'
-  end
-
-  executes do
     if defined?(SequelRails)
+      NewRelic::Agent.logger.info 'Installing Sequel instrumentation (via sequel-rails)'
       ActiveSupport::Notifications.subscribe("sql.sequel") do |*args|
         event = ActiveSupport::Notifications::Event.new(*args)
         duration = (event.end - event.time).to_f
         ::NewRelic::Agent::Instrumentation::SequelDurationRecorder.record(duration, event.payload[:sql])
       end
     else
+      NewRelic::Agent.logger.info 'Installing Sequel instrumentation'
       ::Sequel::Database.class_eval do
         include ::NewRelic::Agent::Instrumentation::SequelInstrumentation
       end
