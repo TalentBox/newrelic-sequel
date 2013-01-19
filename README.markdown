@@ -2,12 +2,17 @@ Newrelic Sequel
 ===============
 **Sequel instrumentation for Newrelic.**
 
+Warning
+-------
+
+This gem is a fork of [newrelic-sequel](https://github.com/realestate-com-au/newrelic-sequel).
+
 Usage
 -----
 
 1. Install gem
 
- >gem install newrelic-sequel
+ >gem install talentbox-newrelic-sequel
 
 2. Config dependencies in application.rb
 
