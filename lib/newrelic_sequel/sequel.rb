@@ -38,7 +38,7 @@ DependencyDetection.defer do
     end
 
     ::Sequel::Dataset.class_eval do
-      
+
       add_method_tracer :first, 'ActiveRecord/#{self.respond_to?(:model) ? self.model.name : "Dataset"}/first'
       add_method_tracer :find_all, 'ActiveRecord/#{self.respond_to?(:model) ? self.model.name : "Dataset"}/find_all'
       add_method_tracer :execute, 'ActiveRecord/#{self.respond_to?(:model) ? self.model.name : "Dataset"}/find'
@@ -56,7 +56,7 @@ DependencyDetection.defer do
       add_method_tracer :execute_ddl, 'ActiveRecord/Database/all'
 
     end
-    
+
   end
 end
 
@@ -74,17 +74,7 @@ module NewRelic
 
         def log_duration_with_newrelic_instrumentation(duration, sql)
           return unless NewRelic::Agent.is_execution_traced?
-          return unless operation = case sql
-                                      when /^\s*select/i then
-                                        'find'
-                                      when /^\s*(update|insert)/i then
-                                        'save'
-                                      when /^\s*delete/i then
-                                        'destroy'
-                                      else
-                                        nil
-                                    end
-
+          return unless operation = extract_operation_from_sql(sql)
           NewRelic::Agent.instance.transaction_sampler.notice_sql(sql, nil, duration)
 
           metrics = ["ActiveRecord/#{operation}", 'ActiveRecord/all']
@@ -93,6 +83,28 @@ module NewRelic
           end
         ensure
           log_duration_without_newrelic_instrumentation(duration, sql)
+        end
+
+        private
+
+        def extract_operation_from_sql(sql)
+          case sql
+          when /^\s*select/i then
+            'find'
+          when /^\s*(update|insert)/i then
+            'save'
+          when /^\s*delete/i then
+            'destroy'
+          when /^\s*with (?:recursive)?/i then
+            # Recursive queries for Postgresql
+            # Syntax is: WITH [RECURSIVE]
+            # The results can be used to select/update/delete rows
+            # we're always tracking it as select here, because finding what the
+            # "real" action is, probably require a full SQL parser.
+            'find'
+          else
+            nil
+          end
         end
 
       end
