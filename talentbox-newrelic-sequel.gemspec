@@ -1,6 +1,6 @@
 # -*- encoding: utf-8 -*-
 
-require "lib/newrelic_sequel/version"
+require "newrelic_sequel/version"
 
 Gem::Specification.new do |s|
   s.name = "talentbox-newrelic-sequel"
