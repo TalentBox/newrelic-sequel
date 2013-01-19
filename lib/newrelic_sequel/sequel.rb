@@ -128,7 +128,8 @@ DependencyDetection.defer do
     if defined?(SequelRails)
       ActiveSupport::Notifications.subscribe("sql.sequel") do |*args|
         event = ActiveSupport::Notifications::Event.new(*args)
-        ::NewRelic::Agent::Instrumentation::SequelDurationRecorder.record(event.duration, event.payload[:sql])
+        duration = (event.end - event.time).to_f
+        ::NewRelic::Agent::Instrumentation::SequelDurationRecorder.record(duration, event.payload[:sql])
       end
     else
       ::Sequel::Database.class_eval do
